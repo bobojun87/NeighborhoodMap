@@ -111,12 +111,10 @@
     
     <script>
       var map;
-
       // 创建地图标记列表集合。
       var markers = [];
-
       var largeInfowindow;
-
+      //标记名称和坐标数据
       var locations = [
           {
             title: 'Park Ave Penthouse', 
@@ -154,7 +152,7 @@
             cityStr: 'Manhattan'
           }
         ];
-
+      //初始化地图
       function initMap() {
         // 创建地图样式模版
         var styles = [
@@ -224,30 +222,29 @@
           }
         ];
 
-        // Constructor creates a new map - only center and zoom are required.
+        // 创建地图，定义坐标初始化定位、缩放比例、样式
         map = new google.maps.Map(document.getElementById('map'), {
           center: {lat: 40.7413549, lng: -73.9980244},
           zoom: 13,
           styles: styles,
           mapTypeControl: false
         });
-
+        //创建地图上弹出窗口
         largeInfowindow = new google.maps.InfoWindow();
 
-        // Style the markers a bit. This will be our listing marker icon.
+        // marker的图标默认样式
         var defaultIcon = makeMarkerIcon('0091ff');
 
-        // Create a "highlighted location" marker color for when the user
-        // mouses over the marker.
+        // marker的图标高亮样式
         var highlightedIcon = makeMarkerIcon('FFFF24');
 
-        // The following group uses the location array to create an array of markers on initialize.
+        // 遍历locations数组创建marker并传入markers数组
         for (var i = 0; i < locations.length; i++) {
-          // Get the position from the location array.
+          // 获取lat和lng值
           var position = locations[i].location;
           var title = locations[i].title;
           var cityStr = locations[i].cityStr;
-          // Create a marker per location, and put into markers array.
+          // 创建标记marker
           var marker = new google.maps.Marker({
             position: position,
             title: title,
@@ -256,113 +253,120 @@
             icon: defaultIcon,
             id: i
           });
+          //使marker显示在地图上
           marker.setMap(map);
-          // Push the marker to our array of markers.
+          // marker传入markers数组
           markers.push(marker);
-          // Create an onclick event to open the large infowindow at each marker.
+          // 创建marker的点击事件
           marker.addListener('click', function() {
+            //获取marker的动画效果
             markerAnimation(this);
+            //获取marker的弹窗信息
             populateInfoWindow(this, largeInfowindow);
           });
 
-          // Two event listeners - one for mouseover, one for mouseout,
-          // to change the colors back and forth.
+          // 所标滑过事件
           marker.addListener('mouseover', function() {
             this.setIcon(highlightedIcon);
           });
+          //鼠标移除事件
           marker.addListener('mouseout', function() {
             this.setIcon(defaultIcon);
           });
         }
+        //初始化调用ViewModel()函数
         ko.applyBindings(new ViewModel());
       }
-
+      //marker动画效果
       function markerAnimation(marker){
         marker.setAnimation(google.maps.Animation.BOUNCE);
         setTimeout(function(){
           marker.setAnimation(null);
         }, 1400);
       }
-      // This function populates the infowindow when the marker is clicked. We'll only allow
-      // one infowindow which will open at the marker that is clicked, and populate based
-      // on that markers position.
+      // marker弹窗信息
       function populateInfoWindow(marker, infowindow) {
-        // Check to make sure the infowindow is not already opened on this marker.
+        // 检查marker的弹窗是否已经打开
         if (infowindow.marker != marker) {
-          // Clear the infowindow content to give the streetview time to load.
+          // 清空弹窗内容
           infowindow.setContent('');
           infowindow.marker = marker;
-          // Make sure the marker property is cleared if the infowindow is closed.
+          // 确保关闭窗口后清除infowindow的marker属性
           infowindow.addListener('closeclick', function() {
             infowindow.marker = null;
           });
-
+          //创建wikipedia和streetView标签
+          var wikiElem = '<ul>',
+              panoElem;
+          //加载StreetViewService接口
+          var streetViewService = new google.maps.StreetViewService();
+          var radius = 50;
+          
+          // 请求数据返回状态正常的情况下根据position的值计算街区位置视图
+          function getStreetView(data, status) {
+            //保证数据返回状态正常，加载街区视图
+            if (status == google.maps.StreetViewStatus.OK) {
+              var nearStreetViewLocation = data.location.latLng;
+              var heading = google.maps.geometry.spherical.computeHeading(
+                    nearStreetViewLocation, marker.position); 
+              var panoramaOptions = {
+                position: nearStreetViewLocation,
+                pov: {
+                  heading: heading,
+                  pitch: 30
+                }
+              };
+              panoElem = document.getElementById('pano');
+              var panorama = new google.maps.StreetViewPanorama(panoElem, panoramaOptions);
+            } else {
+              panoElem.innerHTML = 'No Street View Found';
+            }
+          }
           //获取wikipedia数据
           function getWikipedia(){
-            infowindow.setContent('<h2>' + marker.title + '</h2>' + 
-                  '<div id="pano"></div>' + 
-                  '<h3>Wikipedia Links</h3><ul id="wikipedia-links"></ul>');
-            var $wikiElem = document.getElementById('wikipedia-links');
-            console.log($wikiElem);
+            //wikipedia api接口地址
             var wikipediaUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + 
                     marker.cityStr + '&format=json&callback=wikiCallback';
-            console.log(wikipediaUrl);
+            //设置定时器，如果数据加载超时，提醒用户
             var wikiRequestTimeout = setTimeout(function(){
                 wikiElem = '维基百科数据请求超时，无法加载数据';
+                console.log('wikiDataTimeout');
+                infowindow.setContent('<h2>' + marker.title + '</h2>' + 
+                  '<div id="pano"></div>' + 
+                  '<h3>Wikipedia Links</h3>' + wikiElem);
+                //加载街区视图
+                streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
             }, 8000);
+            //利用jsonp异步加载wikipedia api数据
             $.ajax({
                 url: wikipediaUrl,
                 dataType: 'jsonp'
             }).done(function(response){
                 var wikiData = response[1];
-                console.log(wikiData);
                 for(var i=0; i < wikiData.length; i++){
                   var data = wikiData[i];
-                  $wikiElem.append('<li class="wikipedia">' + 
+                  wikiElem += '<li class="wikipedia">' + 
                     '<a href="http://en.wikipedia.org/wiki/' + data + '">' + data + '</a>' + 
-                    '</li>');
+                    '</li>';
                 }
-                console.log($wikiElem);
+                wikiElem += '</ul>';
+                //设置弹出窗口的内容
+                infowindow.setContent('<h2>' + marker.title + '</h2>' + 
+                  '<div id="pano"></div>' + 
+                  '<h3>Wikipedia Links</h3>' + wikiElem);
+                //数据加载成功清除定时器
                 clearTimeout(wikiRequestTimeout);
+                //加载街区视图
+                streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
               });
-            }
-            var streetViewService = new google.maps.StreetViewService();
-            var radius = 50;
-            // In case the status is OK, which means the pano was found, compute the
-            // position of the streetview image, then calculate the heading, then get a
-            // panorama from that and set the options
-            function getStreetView(data, status) {
-              var panoElem = document.getElementById('pano');
-              if (status == google.maps.StreetViewStatus.OK) {
-                var nearStreetViewLocation = data.location.latLng;
-                var heading = google.maps.geometry.spherical.computeHeading(
-                      nearStreetViewLocation, marker.position); 
-                var panoramaOptions = {
-                  position: nearStreetViewLocation,
-                  pov: {
-                    heading: heading,
-                    pitch: 30
-                  }
-                };
-                panoElem = document.getElementById('pano');
-                var panorama = new google.maps.StreetViewPanorama(panoElem, panoramaOptions);
-              } else {
-                panoElem.innerHTML = 'No Street View Found';
-              }
-            }
+            }          
             getWikipedia();
-            // Use streetview service to get the closest streetview image within
-            // 50 meters of the markers position
-            streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
-            
-            // Open the infowindow on the correct marker.
+            // 打开弹出窗口
             infowindow.open(map, marker);
           }
         }
 
-        // This function takes in a COLOR, and then creates a new marker
-        // icon of that color. The icon will be 21 px wide by 34 high, have an origin
-        // of 0, 0 and be anchored at 10, 34).
+        // 设置marker的图标颜色和形状
         function makeMarkerIcon(markerColor) {
           var markerImage = new google.maps.MarkerImage(
             'http://chart.googleapis.com/chart?chst=d_map_spin&chld=1.15|0|'+ markerColor +
