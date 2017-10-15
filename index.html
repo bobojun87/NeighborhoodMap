@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      html,
+      body {
+        font-family: Arial, sans-serif;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        height: 100%;
+        display: flex;
+        flex-wrap: wrap;
+      }
+
+      input {
+        font-size: 12px;
+      }
+
+      h3 {
+        color: #525454;
+        font-size: 18px;
+        margin: 0 0 10px 0;
+        text-align: center;
+      }
+
+      hr {
+        background: #D0D7D9;
+        height: 1px;
+        margin: 20px 0 20px 0;
+        border: none;
+      }
+
+      #map {
+        height: 94%;
+        width: 100%;
+      }
+
+      .options-box {
+        position: fixed;
+        left: 0;
+        top: 0;
+        background: #fff;
+        border: 1px solid #999;
+        border-radius: 3px;
+        height: 100%;
+        line-height: 35px;
+        padding: 10px 10px 30px 10px;
+        text-align: left;
+        width: 340px;
+        z-index: 1001;
+      }
+
+      #pano {
+        width: 200px;
+        height: 100px;
+      }
+
+      .header {
+        height: 6%;
+        width: 100%;
+        background: #fff;
+        margin-left: 362px;
+      }
+
+      .search-input {
+        line-height: 2em;
+        width: 80%;
+      }
+
+      .menu-icon {
+        font-size: 14px;
+        margin: 5px;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+      ul li {
+        line-height: 1.5em;
+        border-bottom: 1px solid #ccc;
+        cursor: pointer;
+      }
+      ul li:hover {
+        background-color: #cacaca;
+      }
+    </style>
+    <script src="https://cdn.bootcss.com/jquery/3.2.1/jquery.min.js"></script>
+  </head>
+  <body>
+    <div class="options-box" data-bind="visible: showFlag">
+      <span>Search:</span>
+      <input type="text"  class="search-input" data-bind="value: inputValue, valueUpdate: 'afterkeydown'">
+      <h3>Location List</h3>
+      <ul data-bind="foreach: markerList">
+        <li data-bind="text: title, visible: $root.filter(id, title, $root.inputValue), click: $root.clickListings">
+          
+        </li>
+      </ul>
+    </div>
+    <div class="container">
+      <div class="header" data-bind="style: { marginLeft: showFlag() == true ? '362px' : '0' }">
+        <input type="button" class="menu-icon" data-bind="click: showButton" value="显示/隐藏" >
+      </div>
+      <div id="map"></div>
+    </div>
+    
+    <script>
+      var map;
+
+      // 创建地图标记列表集合。
+      var markers = [];
+
+      var largeInfowindow;
+
+      var locations = [
+          {
+            title: 'Park Ave Penthouse', 
+            location: {lat: 40.7713024, lng: -73.9632393},
+            cityStr: 'Park Ave'
+          },
+          {
+            title: 'Chelsea Loft', 
+            location: {lat: 40.7444883, lng: -73.9949465},
+            cityStr: 'Chelsea'
+          },
+          {
+            title: 'Union Square Open Floor Plan', 
+            location: {lat: 40.7347062, lng: -73.9895759},
+            cityStr: 'Union Square'
+          },
+          {
+            title: 'East Village Hip Studio', 
+            location: {lat: 40.7281777, lng: -73.984377},
+            cityStr: 'East Village'
+          },
+          {
+            title: 'TriBeCa Artsy Bachelor Pad', 
+            location: {lat: 40.7195264, lng: -74.0089934},
+            cityStr: 'TriBeCa'
+          },
+          {
+            title: 'Chinatown Homey Space', 
+            location: {lat: 40.7180628, lng: -73.9961237},
+            cityStr: 'Chinatown'
+          },
+          {
+            title: 'Manhattan Bridge',
+            location: {lat:40.7075798804, lng: -73.9908599854},
+            cityStr: 'Manhattan'
+          }
+        ];
+
+      function initMap() {
+        // 创建地图样式模版
+        var styles = [
+          {
+            featureType: 'water',
+            stylers: [
+              { color: '#19a0d8' }
+            ]
+          },{
+            featureType: 'administrative',
+            elementType: 'labels.text.stroke',
+            stylers: [
+              { color: '#ffffff' },
+              { weight: 6 }
+            ]
+          },{
+            featureType: 'administrative',
+            elementType: 'labels.text.fill',
+            stylers: [
+              { color: '#e85113' }
+            ]
+          },{
+            featureType: 'road.highway',
+            elementType: 'geometry.stroke',
+            stylers: [
+              { color: '#efe9e4' },
+              { lightness: -40 }
+            ]
+          },{
+            featureType: 'transit.station',
+            stylers: [
+              { weight: 9 },
+              { hue: '#e85113' }
+            ]
+          },{
+            featureType: 'road.highway',
+            elementType: 'labels.icon',
+            stylers: [
+              { visibility: 'off' }
+            ]
+          },{
+            featureType: 'water',
+            elementType: 'labels.text.stroke',
+            stylers: [
+              { lightness: 100 }
+            ]
+          },{
+            featureType: 'water',
+            elementType: 'labels.text.fill',
+            stylers: [
+              { lightness: -100 }
+            ]
+          },{
+            featureType: 'poi',
+            elementType: 'geometry',
+            stylers: [
+              { visibility: 'on' },
+              { color: '#f0e4d3' }
+            ]
+          },{
+            featureType: 'road.highway',
+            elementType: 'geometry.fill',
+            stylers: [
+              { color: '#efe9e4' },
+              { lightness: -25 }
+            ]
+          }
+        ];
+
+        // Constructor creates a new map - only center and zoom are required.
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: {lat: 40.7413549, lng: -73.9980244},
+          zoom: 13,
+          styles: styles,
+          mapTypeControl: false
+        });
+
+        largeInfowindow = new google.maps.InfoWindow();
+
+        // Style the markers a bit. This will be our listing marker icon.
+        var defaultIcon = makeMarkerIcon('0091ff');
+
+        // Create a "highlighted location" marker color for when the user
+        // mouses over the marker.
+        var highlightedIcon = makeMarkerIcon('FFFF24');
+
+        // The following group uses the location array to create an array of markers on initialize.
+        for (var i = 0; i < locations.length; i++) {
+          // Get the position from the location array.
+          var position = locations[i].location;
+          var title = locations[i].title;
+          var cityStr = locations[i].cityStr;
+          // Create a marker per location, and put into markers array.
+          var marker = new google.maps.Marker({
+            position: position,
+            title: title,
+            cityStr: cityStr,
+            animation: google.maps.Animation.DROP,
+            icon: defaultIcon,
+            id: i
+          });
+          marker.setMap(map);
+          // Push the marker to our array of markers.
+          markers.push(marker);
+          // Create an onclick event to open the large infowindow at each marker.
+          marker.addListener('click', function() {
+            markerAnimation(this);
+            populateInfoWindow(this, largeInfowindow);
+          });
+
+          // Two event listeners - one for mouseover, one for mouseout,
+          // to change the colors back and forth.
+          marker.addListener('mouseover', function() {
+            this.setIcon(highlightedIcon);
+          });
+          marker.addListener('mouseout', function() {
+            this.setIcon(defaultIcon);
+          });
+        }
+        ko.applyBindings(new ViewModel());
+      }
+
+      function markerAnimation(marker){
+        marker.setAnimation(google.maps.Animation.BOUNCE);
+        setTimeout(function(){
+          marker.setAnimation(null);
+        }, 1400);
+      }
+      // This function populates the infowindow when the marker is clicked. We'll only allow
+      // one infowindow which will open at the marker that is clicked, and populate based
+      // on that markers position.
+      function populateInfoWindow(marker, infowindow) {
+        // Check to make sure the infowindow is not already opened on this marker.
+        if (infowindow.marker != marker) {
+          // Clear the infowindow content to give the streetview time to load.
+          infowindow.setContent('');
+          infowindow.marker = marker;
+          // Make sure the marker property is cleared if the infowindow is closed.
+          infowindow.addListener('closeclick', function() {
+            infowindow.marker = null;
+          });
+
+          //获取wikipedia数据
+          function getWikipedia(){
+            infowindow.setContent('<h2>' + marker.title + '</h2>' + 
+                  '<div id="pano"></div>' + 
+                  '<h3>Wikipedia Links</h3><ul id="wikipedia-links"></ul>');
+            var $wikiElem = document.getElementById('wikipedia-links');
+            console.log($wikiElem);
+            var wikipediaUrl = 'http://en.wikipedia.org/w/api.php?action=opensearch&search=' + 
+                    marker.cityStr + '&format=json&callback=wikiCallback';
+            console.log(wikipediaUrl);
+            var wikiRequestTimeout = setTimeout(function(){
+                wikiElem = '维基百科数据请求超时，无法加载数据';
+            }, 8000);
+            $.ajax({
+                url: wikipediaUrl,
+                dataType: 'jsonp'
+            }).done(function(response){
+                var wikiData = response[1];
+                console.log(wikiData);
+                for(var i=0; i < wikiData.length; i++){
+                  var data = wikiData[i];
+                  $wikiElem.append('<li class="wikipedia">' + 
+                    '<a href="http://en.wikipedia.org/wiki/' + data + '">' + data + '</a>' + 
+                    '</li>');
+                }
+                console.log($wikiElem);
+                clearTimeout(wikiRequestTimeout);
+              });
+            }
+            var streetViewService = new google.maps.StreetViewService();
+            var radius = 50;
+            // In case the status is OK, which means the pano was found, compute the
+            // position of the streetview image, then calculate the heading, then get a
+            // panorama from that and set the options
+            function getStreetView(data, status) {
+              var panoElem = document.getElementById('pano');
+              if (status == google.maps.StreetViewStatus.OK) {
+                var nearStreetViewLocation = data.location.latLng;
+                var heading = google.maps.geometry.spherical.computeHeading(
+                      nearStreetViewLocation, marker.position); 
+                var panoramaOptions = {
+                  position: nearStreetViewLocation,
+                  pov: {
+                    heading: heading,
+                    pitch: 30
+                  }
+                };
+                panoElem = document.getElementById('pano');
+                var panorama = new google.maps.StreetViewPanorama(panoElem, panoramaOptions);
+              } else {
+                panoElem.innerHTML = 'No Street View Found';
+              }
+            }
+            getWikipedia();
+            // Use streetview service to get the closest streetview image within
+            // 50 meters of the markers position
+            streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
+            
+            // Open the infowindow on the correct marker.
+            infowindow.open(map, marker);
+          }
+        }
+
+        // This function takes in a COLOR, and then creates a new marker
+        // icon of that color. The icon will be 21 px wide by 34 high, have an origin
+        // of 0, 0 and be anchored at 10, 34).
+        function makeMarkerIcon(markerColor) {
+          var markerImage = new google.maps.MarkerImage(
+            'http://chart.googleapis.com/chart?chst=d_map_spin&chld=1.15|0|'+ markerColor +
+            '|40|_|%E2%80%A2',
+            new google.maps.Size(21, 34),
+            new google.maps.Point(0, 0),
+            new google.maps.Point(10, 34),
+            new google.maps.Size(21,34));
+          return markerImage;
+        }
+    </script>
+    <script src="js/knockout-3.4.2-min.js"></script>
+    <script src="js/main.js"></script>
+    <script async defer
+        src=
+        "https://maps.googleapis.com/maps/api/js?libraries=places,geometry,drawing&key=AIzaSyDIOQrlmv7olR8eeGaG9aZe_ZZMir2IDVo&v=3&callback=initMap">
+    </script>
+
+  </body>
+</html>
