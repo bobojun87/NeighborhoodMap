@@ -24,7 +24,10 @@ var ViewModel = function(){
   //根据输入框的值，判断是否显示
   this.filter = function(id, title, value){
     //判断列表名字中是否包含输入的值
-    this.result = title().indexOf(value());
+    //都转化为小写匹配，使得在页面上同时匹配大小写
+    var title = title().toLowerCase();
+    var val = value().toLowerCase();
+    this.result = title.indexOf(val);
     // 值为-1时表示没有匹配的字符串
     if(this.result == -1){
       //根据列表的ID值判断并更新地图中的marker是否显示
@@ -41,6 +44,8 @@ var ViewModel = function(){
     self.currentId = marker.id();
     //根据ID值调用的marker的加载动画效果函数
     markerAnimation(markers[self.currentId]);
+    ////把点击的marker设置为地图中心点
+    setCenterMarker(markers[self.currentId]);
     //根据ID值调用的marker的加载弹窗内容函数
     populateInfoWindow(markers[self.currentId], largeInfowindow);
   }

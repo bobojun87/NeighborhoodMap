@@ -261,6 +261,8 @@
           marker.addListener('click', function() {
             //获取marker的动画效果
             markerAnimation(this);
+            //设置当前marker为地图中心点
+            setCenterMarker(this);
             //获取marker的弹窗信息
             populateInfoWindow(this, largeInfowindow);
           });
@@ -283,6 +285,10 @@
         setTimeout(function(){
           marker.setAnimation(null);
         }, 1400);
+      }
+      //把点击的marker设置为地图中心点
+      function setCenterMarker(marker){
+        map.panTo(marker.position);
       }
       // marker弹窗信息
       function populateInfoWindow(marker, infowindow) {
@@ -377,12 +383,17 @@
             new google.maps.Size(21,34));
           return markerImage;
         }
+        //提示错误信息
+        function mapErrorHandler(){
+          alert('加载地图时出错，请确认地址');
+        }
+        //ERR_EMPTY_RESPONSE
     </script>
     <script src="js/knockout-3.4.2-min.js"></script>
     <script src="js/main.js"></script>
     <script async defer
         src=
-        "https://maps.googleapis.com/maps/api/js?libraries=places,geometry,drawing&key=AIzaSyDIOQrlmv7olR8eeGaG9aZe_ZZMir2IDVo&v=3&callback=initMap">
+        "https://maps.googleapis.com/maps/api/js?libraries=places,geometry,drawing&key=AIzaSyDIOQrlmv7olR8eeGaG9aZe_ZZMir2IDVo&v=3&callback=initMap" onerror="mapErrorHandler()">
     </script>
 
   </body>
